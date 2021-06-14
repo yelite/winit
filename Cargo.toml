@@ -20,7 +20,7 @@ targets = ["i686-pc-windows-msvc", "x86_64-pc-windows-msvc", "i686-unknown-linux
 default = ["x11", "wayland"]
 web-sys = ["web_sys", "wasm-bindgen", "instant/wasm-bindgen"]
 stdweb = ["std_web", "instant/stdweb"]
-x11 = ["x11-dl", "mio", "mio-misc", "mio-extras", "percent-encoding", "parking_lot", "xkbcommon-dl/x11"]
+x11 = ["x11-dl", "mio", "mio-misc", "percent-encoding", "parking_lot", "xkbcommon-dl/x11"]
 wayland = ["wayland-client", "sctk", "memmap2"]
 
 [dependencies]
