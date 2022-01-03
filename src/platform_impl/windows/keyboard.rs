@@ -76,6 +76,7 @@ impl KeyEventBuilder {
         msg_kind: u32,
         wparam: WPARAM,
         lparam: LPARAM,
+        next_msg: &Option<winuser::MSG>,
         result: &mut ProcResult,
     ) -> Vec<MessageAsKeyEvent> {
         match msg_kind {
@@ -111,21 +112,9 @@ impl KeyEventBuilder {
                     &mut layouts,
                 );
 
-                let mut next_msg = MaybeUninit::uninit();
-                let peek_retval = unsafe {
-                    winuser::PeekMessageW(
-                        next_msg.as_mut_ptr(),
-                        hwnd,
-                        winuser::WM_KEYFIRST,
-                        winuser::WM_KEYLAST,
-                        winuser::PM_NOREMOVE,
-                    )
-                };
-                let has_next_key_message = peek_retval != 0;
                 self.event_info = None;
                 let mut finished_event_info = Some(event_info);
-                if has_next_key_message {
-                    let next_msg = unsafe { next_msg.assume_init() };
+                if let Some(next_msg) = next_msg {
                     let next_msg_kind = next_msg.message;
                     let next_belongs_to_this = !matches!(
                         next_msg_kind,
@@ -140,7 +129,7 @@ impl KeyEventBuilder {
                         let (_, layout) = layouts.get_current_layout();
                         let is_fake = {
                             let curr_event = finished_event_info.as_ref().unwrap();
-                            is_current_fake(curr_event, next_msg, layout)
+                            is_current_fake(curr_event, &next_msg, layout)
                         };
                         if is_fake {
                             finished_event_info = None;
@@ -178,28 +167,14 @@ impl KeyEventBuilder {
 
                 let is_utf16 = is_high_surrogate || is_low_surrogate;
 
-                let more_char_coming;
-                unsafe {
-                    let mut next_msg = MaybeUninit::uninit();
-                    let has_message = winuser::PeekMessageW(
-                        next_msg.as_mut_ptr(),
-                        hwnd,
-                        winuser::WM_KEYFIRST,
-                        winuser::WM_KEYLAST,
-                        winuser::PM_NOREMOVE,
-                    );
-                    let has_message = has_message != 0;
-                    if !has_message {
-                        more_char_coming = false;
+                let more_char_coming = {
+                    if let Some(next_msg) = next_msg {
+                        let next_msg = next_msg.message;
+                        next_msg == winuser::WM_CHAR || next_msg == winuser::WM_SYSCHAR
                     } else {
-                        let next_msg = next_msg.assume_init().message;
-                        if next_msg == winuser::WM_CHAR || next_msg == winuser::WM_SYSCHAR {
-                            more_char_coming = true;
-                        } else {
-                            more_char_coming = false;
-                        }
+                        false
                     }
-                }
+                };
 
                 if is_utf16 {
                     if let Some(ev_info) = self.event_info.as_mut() {
@@ -278,24 +253,12 @@ impl KeyEventBuilder {
                     ElementState::Released,
                     &mut layouts,
                 );
-                let mut next_msg = MaybeUninit::uninit();
-                let peek_retval = unsafe {
-                    winuser::PeekMessageW(
-                        next_msg.as_mut_ptr(),
-                        hwnd,
-                        winuser::WM_KEYFIRST,
-                        winuser::WM_KEYLAST,
-                        winuser::PM_NOREMOVE,
-                    )
-                };
-                let has_next_key_message = peek_retval != 0;
                 let mut valid_event_info = Some(event_info);
-                if has_next_key_message {
-                    let next_msg = unsafe { next_msg.assume_init() };
+                if let Some(next_msg) = next_msg {
                     let (_, layout) = layouts.get_current_layout();
                     let is_fake = {
                         let event_info = valid_event_info.as_ref().unwrap();
-                        is_current_fake(&event_info, next_msg, layout)
+                        is_current_fake(&event_info, &next_msg, layout)
                     };
                     if is_fake {
                         valid_event_info = None;
@@ -755,7 +718,7 @@ fn get_async_kbd_state() -> [u8; 256] {
 /// fake Ctrl event.
 fn is_current_fake(
     curr_info: &PartialKeyEventInfo,
-    next_msg: winuser::MSG,
+    next_msg: &winuser::MSG,
     layout: &Layout,
 ) -> bool {
     let curr_is_ctrl = matches!(curr_info.logical_key, PartialLogicalKey::This(Key::Control));
