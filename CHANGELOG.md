@@ -1,5 +1,9 @@
 # Unreleased
 
+- On X11, EINTR while polling for events no longer causes a panic. Instead it will be treated as a spurious wakeup.
+
+# 0.25.0 (2021-05-15)
+
 - **Breaking:** On macOS, replace `WindowBuilderExtMacOS::with_activation_policy` with `EventLoopExtMacOS::set_activation_policy`
 - On macOS, wait with activating the application until the application has initialized.
 - On macOS, fix creating new windows when the application has a main menu.
